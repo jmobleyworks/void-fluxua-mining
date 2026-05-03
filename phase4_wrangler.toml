@@ -9,7 +9,7 @@ workers_dev = true
 # Top-level configuration variables
 [vars]
 WORKER_NAME = "phase4-coord"
-REGISTER_COUNT = "50"
+REGISTER_COUNT = "100"
 
 # Build configuration
 [build]
