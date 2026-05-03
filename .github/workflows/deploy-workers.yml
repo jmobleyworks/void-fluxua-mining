@@ -53,7 +53,12 @@ jobs:
           #!/bin/bash
           set -e
 
-          ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+          # Export environment variables explicitly for subshells
+          export CF_API_KEY="${{ env.CF_API_KEY }}"
+          export CF_API_EMAIL="${{ env.CF_API_EMAIL }}"
+          export CLOUDFLARE_ACCOUNT_ID="${{ env.CLOUDFLARE_ACCOUNT_ID }}"
+
+          ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID}"
           SCRIPT_DIR="gen0_stage2_deployment"
           WORKER_CODE="$SCRIPT_DIR/gen0_worker_complete.js"
           TEMP_DIR="/tmp/wrangler_miners_github"
@@ -105,7 +110,7 @@ jobs:
           cwd = ""
           EOF
 
-            if (cd "$TEMP_DIR" && wrangler deploy --config "wrangler_$i.toml" --env production 2>&1 | grep -q "Uploaded.*wrangler_$i.toml\|deployed successfully"); then
+            if cd "$TEMP_DIR" && wrangler deploy --config "wrangler_$i.toml" --env production >/dev/null 2>&1; then
               ((success++))
             else
               ((failed++))
