@@ -51,7 +51,6 @@ jobs:
       - name: Deploy 500 mining-register workers
         run: |
           #!/bin/bash
-          set -e
 
           # Export environment variables explicitly for subshells
           export CF_API_KEY="${{ env.CF_API_KEY }}"
@@ -69,6 +68,7 @@ jobs:
           success=0
           failed=0
 
+          set +e  # Don't exit on errors in the loop
           for i in {0..499}; do
             WORKER_NAME="mining-register-$i"
 
@@ -110,7 +110,7 @@ jobs:
           cwd = ""
           EOF
 
-            if cd "$TEMP_DIR" && wrangler deploy --config "wrangler_$i.toml" --env production >/dev/null 2>&1; then
+            if (cd "$TEMP_DIR" && wrangler deploy --config "wrangler_$i.toml" --env production >/dev/null 2>&1); then
               ((success++))
             else
               ((failed++))
@@ -118,6 +118,7 @@ jobs:
 
             sleep 0.2
           done
+          set -e  # Re-enable error exit
 
           echo ""
           echo "Deploy complete! Success: $success / 500, Failed: $failed / 500"
