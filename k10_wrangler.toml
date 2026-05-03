@@ -1,5 +1,5 @@
 name = "mascom-phase0"
-main = "k10_worker_modern.js"
+main = "k_register_parameterized.js"
 compatibility_date = "2024-01-01"
 
 # Account configuration
@@ -9,21 +9,10 @@ workers_dev = true
 # Authentication (use environment variables)
 # CLOUDFLARE_API_TOKEN and CLOUDFLARE_EMAIL
 
-# Environment: production (default)
-[env.production]
-
-# Environment variables (accessible as env.VARIABLE_NAME)
-[env.production.vars]
+# Top-level configuration variables
+[vars]
 WORKER_NAME = "mascom-phase0"
-REGISTER_COUNT = "10"
-
-# D1 Database binding (packet pattern ledger storage with SQL queries)
-# NOTE: Replace DATABASE_ID with actual D1 database ID
-# Get ID from: wrangler d1 list
-[[env.production.d1_databases]]
-binding = "DB"
-database_id = "sync-ledger-d1"
-database_name = "mascom-phase0-ledger"
+REGISTER_COUNT = "40"
 
 # Build configuration
 [build]
