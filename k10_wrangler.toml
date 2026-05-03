@@ -1,5 +1,5 @@
 name = "mascom-phase0"
-main = "k10_worker_d1_ledger.js"
+main = "k10_worker_modern.js"
 compatibility_date = "2024-01-01"
 
 # Account configuration
