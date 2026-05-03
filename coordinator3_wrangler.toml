@@ -1,0 +1,17 @@
+name = "coordinator-3"
+main = "k_register_parameterized.js"
+compatibility_date = "2024-01-01"
+
+# Account configuration
+account_id = "f07be5f84583d0d100b05aeeae56870b"
+workers_dev = true
+
+# Top-level configuration variables
+[vars]
+WORKER_NAME = "coordinator-3"
+REGISTER_COUNT = "100"
+
+# Build configuration
+[build]
+command = ""
+cwd = ""
