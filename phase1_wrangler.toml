@@ -3,7 +3,7 @@ main = "k10_worker_modern.js"
 compatibility_date = "2024-01-01"
 
 # Account configuration
-account_id = "f07be5f84583d0d100b05aeeae56870b"
+account_id = "7b2347dce656e4f0959b2e20a9bafee3"
 workers_dev = true
 
 # Environment: production (default)

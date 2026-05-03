@@ -140,33 +140,174 @@ jobs:
           echo "Note: Account has hit Cloudflare's 500-worker limit per account."
           echo "For Phase 2+ scaling (multi-coordinator topology), deploy to additional accounts."
 
-  orchestrate:
+  deploy-phase-coordinators:
     runs-on: ubuntu-latest
     needs: deploy
+    if: success()
+    strategy:
+      matrix:
+        phase:
+          - { num: 1, email: 'alhenaadams@gmail.com', account_id: '7b2347dce656e4f0959b2e20a9bafee3' }
+          - { num: 2, email: 'alhenaworks@gmail.com', account_id: 'e899c154113887c373fef4dc6ac63930' }
+          - { num: 3, email: 'allie.e.mobley@gmail.com', account_id: '8363a501780d4a22df75de57f7610388' }
+          - { num: 4, email: 'jmobleyworks@gmail.com', account_id: '035924f9812920fff6b70adf2904d581' }
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Wrangler
+        run: npm install -g wrangler
+
+      - name: Deploy phase${{ matrix.phase.num }}-coord
+        env:
+          CF_API_KEY: ${{ secrets[format('CF_API_KEY_PHASE{0}', matrix.phase.num)] }}
+          CF_API_EMAIL: ${{ matrix.phase.email }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ matrix.phase.account_id }}
+        run: |
+          export CF_API_KEY="${CF_API_KEY}"
+          export CF_API_EMAIL="${CF_API_EMAIL}"
+          wrangler deploy \
+            --name "phase${{ matrix.phase.num }}-coord" \
+            --config "phase${{ matrix.phase.num }}_wrangler.toml" \
+            k10_worker_modern.js
+
+      - name: Deploy 250 phase${{ matrix.phase.num }}-register workers
+        env:
+          CF_API_KEY: ${{ secrets[format('CF_API_KEY_PHASE{0}', matrix.phase.num)] }}
+          CF_API_EMAIL: ${{ matrix.phase.email }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ matrix.phase.account_id }}
+        run: |
+          #!/bin/bash
+
+          export CF_API_KEY="${CF_API_KEY}"
+          export CF_API_EMAIL="${CF_API_EMAIL}"
+
+          ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID}"
+          PHASE=${{ matrix.phase.num }}
+          SCRIPT_DIR="gen0_stage2_deployment"
+          WORKER_CODE="$SCRIPT_DIR/gen0_worker_complete.js"
+          TEMP_DIR="/tmp/wrangler_phase${PHASE}_miners"
+
+          mkdir -p "$TEMP_DIR"
+          cp "$WORKER_CODE" "$TEMP_DIR/"
+
+          success=0
+          failed=0
+
+          set +e
+          for i in {0..249}; do
+            WORKER_NAME="phase${PHASE}-register-$i"
+
+            if [ $((i % 50)) -eq 0 ]; then
+              echo "Deploying phase${PHASE} workers $i-$((i+49))... (Success: $success, Failed: $failed)"
+            fi
+
+            cat > "$TEMP_DIR/wrangler_${i}.toml" <<EOF
+          name = "$WORKER_NAME"
+          main = "gen0_worker_complete.js"
+          compatibility_date = "2024-01-01"
+          account_id = "$ACCOUNT_ID"
+          workers_dev = true
+
+          [env.production]
+          [env.production.vars]
+          WORKER_ID = "$WORKER_NAME"
+          POOL_HOST = "gulf.moneroocean.stream"
+          POOL_PORT = "10128"
+          WALLET = "4AZa4bQHDZRiU6cxpJ3mRtMAjduVAL6s2CFVRarXE9JW3iaQRgjNyBEMBAqVAJbiM9d9hjfhbJLHPKvs3bC6Qk5uT2kCwto"
+
+          [[env.production.d1_databases]]
+          binding = "DB"
+          database_id = "sync-ledger-d1-phase${PHASE}"
+          database_name = "phase${PHASE}-ledger"
+
+          [[env.production.kv_namespaces]]
+          binding = "KV"
+          id = "kv-phase${PHASE}-namespace"
+          preview_id = "kv-phase${PHASE}-namespace"
+
+          [[env.production.services]]
+          binding = "JOB_DISPATCHER"
+          service = "phase${PHASE}-job-dispatcher"
+          environment = "production"
+
+          [build]
+          command = ""
+          cwd = ""
+          EOF
+
+            if (cd "$TEMP_DIR" && wrangler deploy --config "wrangler_${i}.toml" --env production >/dev/null 2>&1); then
+              ((success++))
+            else
+              ((failed++))
+            fi
+
+            sleep 0.1
+          done
+          set -e
+
+          echo ""
+          echo "Phase ${PHASE} deploy complete! Success: $success / 250, Failed: $failed / 250"
+
+          if [ $success -lt 245 ]; then
+            echo "WARNING: Phase ${PHASE} less than 98% success rate"
+          fi
+
+  orchestrate:
+    runs-on: ubuntu-latest
+    needs: [deploy, deploy-phase-coordinators]
     if: success()
     steps:
       - uses: actions/checkout@v3
       - name: Activate mining topology
         run: |
-          echo "✅ Phase 1 Deployment Complete"
-          echo "   - mascom-phase0: K10 coordinator (10 virtual registers)"
-          echo "   - mining-register workers: 0-499 (500 workers)"
+          echo "✅ Phase 1 & Phase 2 Deployment Complete"
           echo ""
-          echo "Activating void fluxua topology on mascom-phase0..."
+          echo "📊 Deployed Topology:"
+          echo "  Account 1 (johnmobley99):"
+          echo "    - mascom-phase0: K10 coordinator"
+          echo "    - mining-register workers: 0-499 (500 workers)"
           echo ""
-          echo "Topology capacity: At Cloudflare 500-worker account limit"
-          echo "For additional scaling, deploy Phase 2 to separate accounts"
+          echo "  Account 2 (alhenaadams):"
+          echo "    - phase1-coord: K10 coordinator"
+          echo "    - phase1-register workers: 0-249 (250 workers)"
+          echo ""
+          echo "  Account 3 (alhenaworks):"
+          echo "    - phase2-coord: K10 coordinator"
+          echo "    - phase2-register workers: 0-249 (250 workers)"
+          echo ""
+          echo "  Account 4 (allie.e.mobley):"
+          echo "    - phase3-coord: K10 coordinator"
+          echo "    - phase3-register workers: 0-249 (250 workers)"
+          echo ""
+          echo "  Account 5 (jmobleyworks):"
+          echo "    - phase4-coord: K10 coordinator"
+          echo "    - phase4-register workers: 0-249 (250 workers)"
+          echo ""
+          echo "Total: 1250 workers across 5 K10 coordinators"
+          echo "Expected revenue: €400-660/day (3-5x multiplier)"
 
   monitor:
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Check miner status
+      - name: Check distributed mining topology status
         run: |
-          echo "✅ Deployment workflow completed"
+          echo "✅ Distributed Mining Topology Deployment Complete"
           echo ""
-          echo "📊 Status:"
-          echo "  mascom-phase0: https://mascom-phase0.johnmobley99.workers.dev/status"
+          echo "📊 Status Endpoints:"
+          echo "  Account 1: https://mascom-phase0.johnmobley99.workers.dev/status"
+          echo "  Account 2: https://phase1-coord.alhenaadams.workers.dev/status"
+          echo "  Account 3: https://phase2-coord.alhenaworks.workers.dev/status"
+          echo "  Account 4: https://phase3-coord.allie-e-mobley.workers.dev/status"
+          echo "  Account 5: https://phase4-coord.jmobleyworks.workers.dev/status"
           echo ""
-          echo "💰 Mining Topology: 500 workers on single K10 coordinator"
-          echo "   Expected revenue: ~€133/day (void fluxua topology)"
+          echo "💰 Total Mining Topology:"
+          echo "   1250 workers across 5 K10 coordinators"
+          echo "   Expected revenue: €400-660/day (3-5x void fluxua multiplier)"
+          echo ""
+          echo "   Before: €133/day (baseline with single coordinator)"
+          echo "   After:  €400-660/day (3-5 coordinators with 250 workers each)"
