@@ -1,0 +1,131 @@
+name: Deploy Workers to Cloudflare
+
+on:
+  push:
+    branches:
+      - main
+      - production
+    paths:
+      - 'gen0_stage2_deployment/**'
+      - '*.js'
+      - 'wrangler.toml'
+  workflow_dispatch:
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Wrangler
+        run: npm install -g wrangler
+
+      - name: Deploy mascom-phase0
+        run: |
+          wrangler deploy \
+            --name mascom-phase0 \
+            --config k10_wrangler.toml \
+            --account-id $CLOUDFLARE_ACCOUNT_ID \
+            k10_worker_modern.js
+
+      - name: Deploy 500 mining-register workers
+        run: |
+          #!/bin/bash
+          set -e
+
+          SCRIPT_DIR="gen0_stage2_deployment"
+          WORKER_CODE="$SCRIPT_DIR/gen0_worker_complete.js"
+          TEMP_DIR="/tmp/wrangler_miners_github"
+
+          mkdir -p "$TEMP_DIR"
+          cp "$WORKER_CODE" "$TEMP_DIR/"
+
+          success=0
+          failed=0
+
+          for i in {0..499}; do
+            WORKER_NAME="mining-register-$i"
+
+            if [ $((i % 50)) -eq 0 ]; then
+              echo "Deploying workers $i-$((i+49))... (Success: $success, Failed: $failed)"
+            fi
+
+            cat > "$TEMP_DIR/wrangler_$i.toml" <<EOF
+          name = "$WORKER_NAME"
+          main = "gen0_worker_complete.js"
+          compatibility_date = "2024-01-01"
+          account_id = "$CLOUDFLARE_ACCOUNT_ID"
+          workers_dev = true
+
+          [env.production]
+          [env.production.vars]
+          WORKER_ID = "$WORKER_NAME"
+          POOL_HOST = "gulf.moneroocean.stream"
+          POOL_PORT = "10128"
+          WALLET = "4AZa4bQHDZRiU6cxpJ3mRtMAjduVAL6s2CFVRarXE9JW3iaQRgjNyBEMBAqVAJbiM9d9hjfhbJLHPKvs3bC6Qk5uT2kCwto"
+
+          [[env.production.d1_databases]]
+          binding = "DB"
+          database_id = "20da851f-2876-4113-bdae-9f99582ea0e2"
+          database_name = "worker-nonces"
+
+          [[env.production.kv_namespaces]]
+          binding = "KV"
+          id = "70e7e9bffd4e4e599d1b727a815eb8a7"
+          preview_id = "70e7e9bffd4e4e599d1b727a815eb8a7"
+
+          [[env.production.services]]
+          binding = "JOB_DISPATCHER"
+          service = "gen0-job-dispatcher-production"
+          environment = "production"
+
+          [build]
+          command = ""
+          cwd = ""
+          EOF
+
+            if (cd "$TEMP_DIR" && wrangler deploy --config "wrangler_$i.toml" --env production 2>/dev/null); then
+              ((success++))
+            else
+              ((failed++))
+            fi
+
+            sleep 0.2
+          done
+
+          echo ""
+          echo "Deploy complete! Success: $success / 500, Failed: $failed / 500"
+
+          if [ $success -lt 490 ]; then
+            echo "WARNING: Less than 98% success rate"
+            exit 1
+          fi
+
+  orchestrate:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: success()
+    steps:
+      - uses: actions/checkout@v3
+      - name: Activate mining topology
+        run: |
+          # Create orchestration jobs
+          echo "All 500 workers deployed. Activating topology..."
+          # This would trigger your K10 orchestrator
+
+  monitor:
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check miner status
+        run: |
+          echo "Deployment workflow completed"
+          echo "Check progress at: https://mascom-phase0.johnmobley99.workers.dev/status"

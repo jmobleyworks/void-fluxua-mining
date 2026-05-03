@@ -1,0 +1,22 @@
+name = "gen0-job-dispatcher"
+main = "gen0_job_dispatcher.js"
+compatibility_date = "2024-01-01"
+
+account_id = "f07be5f84583d0d100b05aeeae56870b"
+workers_dev = true
+
+[env.production]
+
+# Environment variables
+[env.production.vars]
+DISPATCHER_ID = "dispatcher-0"
+
+# D1 Database binding (shared with main worker)
+[[env.production.d1_databases]]
+binding = "DB"
+database_id = "20da851f-2876-4113-bdae-9f99582ea0e2"
+database_name = "worker-nonces"
+
+[build]
+command = ""
+cwd = ""

@@ -1,0 +1,40 @@
+name = "gen0-mining-complete"
+main = "gen0_worker_complete.js"
+compatibility_date = "2024-01-01"
+
+# Account configuration
+account_id = "f07be5f84583d0d100b05aeeae56870b"
+workers_dev = true
+
+# Environment: production
+[env.production]
+
+# Environment variables (accessible as env.VARIABLE_NAME)
+[env.production.vars]
+WORKER_ID = "gen0-worker-main"
+POOL_HOST = "gulf.moneroocean.stream"
+POOL_PORT = "10128"
+WALLET = "4AZa4bQHDZRiU6cxpJ3mRtMAjduVAL6s2CFVRarXE9JW3iaQRgjNyBEMBAqVAJbiM9d9hjfhbJLHPKvs3bC6Qk5uT2kCwto"
+
+# D1 Database binding (persistent disk storage)
+[[env.production.d1_databases]]
+binding = "DB"
+database_id = "20da851f-2876-4113-bdae-9f99582ea0e2"
+database_name = "worker-nonces"
+
+# KV Namespace binding (fast RAM-like storage)
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "70e7e9bffd4e4e599d1b727a815eb8a7"
+preview_id = "70e7e9bffd4e4e599d1b727a815eb8a7"
+
+# Service bindings (cross-worker communication)
+[[env.production.services]]
+binding = "JOB_DISPATCHER"
+service = "gen0-job-dispatcher-production"
+environment = "production"
+
+# Build configuration
+[build]
+command = ""
+cwd = ""

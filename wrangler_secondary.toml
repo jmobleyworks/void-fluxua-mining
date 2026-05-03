@@ -1,0 +1,19 @@
+name = "mining-register"
+main = "src/index.js"
+compatibility_date = "2024-04-15"
+
+account_id = "035924f9812920fff6b70adf2904d581"
+routes = [
+  { pattern = "mining-register-*.jmobleyworks.workers.dev", zone_id = "" }
+]
+
+[env.production]
+account_id = "035924f9812920fff6b70adf2904d581"
+routes = [
+  { pattern = "mining-register-*.jmobleyworks.workers.dev", zone_id = "" }
+]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mascom-phase0-ledger"
+database_id = "db6adeef-1db0-4973-b4e0-f40413edcb70"

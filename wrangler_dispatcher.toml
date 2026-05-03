@@ -1,0 +1,6 @@
+name = "gen0-job-dispatcher-production"
+main = "gen0_job_dispatcher_consolidated.js"
+compatibility_date = "2024-04-01"
+
+[env.production]
+name = "gen0-job-dispatcher-production"

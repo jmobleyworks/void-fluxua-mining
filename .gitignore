@@ -1,0 +1,14 @@
+node_modules/
+.wrangler/
+.env
+.env.local
+dist/
+build/
+*.log
+.DS_Store
+tmp/
+temp/
+/tmp/
+temp_deploys/
+.vscode/
+.idea/

