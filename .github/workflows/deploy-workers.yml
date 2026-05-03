@@ -59,7 +59,7 @@ jobs:
 
           ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID}"
           SCRIPT_DIR="gen0_stage2_deployment"
-          WORKER_CODE="$SCRIPT_DIR/gen0_worker_complete.js"
+          WORKER_CODE="$SCRIPT_DIR/gen0_worker_mining_basic.js"
           TEMP_DIR="/tmp/wrangler_miners_github"
 
           mkdir -p "$TEMP_DIR"
@@ -78,7 +78,7 @@ jobs:
 
             cat > "$TEMP_DIR/wrangler_$i.toml" <<EOF
           name = "$WORKER_NAME"
-          main = "gen0_worker_complete.js"
+          main = "gen0_worker_mining_basic.js"
           compatibility_date = "2024-01-01"
           account_id = "$ACCOUNT_ID"
           workers_dev = true
@@ -90,20 +90,10 @@ jobs:
           POOL_PORT = "10128"
           WALLET = "4AZa4bQHDZRiU6cxpJ3mRtMAjduVAL6s2CFVRarXE9JW3iaQRgjNyBEMBAqVAJbiM9d9hjfhbJLHPKvs3bC6Qk5uT2kCwto"
 
-          [[env.production.d1_databases]]
-          binding = "DB"
-          database_id = "20da851f-2876-4113-bdae-9f99582ea0e2"
-          database_name = "worker-nonces"
-
           [[env.production.kv_namespaces]]
           binding = "KV"
           id = "70e7e9bffd4e4e599d1b727a815eb8a7"
           preview_id = "70e7e9bffd4e4e599d1b727a815eb8a7"
-
-          [[env.production.services]]
-          binding = "JOB_DISPATCHER"
-          service = "gen0-job-dispatcher-production"
-          environment = "production"
 
           [build]
           command = ""
@@ -188,7 +178,7 @@ jobs:
           ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID}"
           PHASE=${{ matrix.phase.num }}
           SCRIPT_DIR="gen0_stage2_deployment"
-          WORKER_CODE="$SCRIPT_DIR/gen0_worker_complete.js"
+          WORKER_CODE="$SCRIPT_DIR/gen0_worker_mining_basic.js"
           TEMP_DIR="/tmp/wrangler_phase${PHASE}_miners"
 
           mkdir -p "$TEMP_DIR"
@@ -207,7 +197,7 @@ jobs:
 
             cat > "$TEMP_DIR/wrangler_${i}.toml" <<EOF
           name = "$WORKER_NAME"
-          main = "gen0_worker_complete.js"
+          main = "gen0_worker_mining_basic.js"
           compatibility_date = "2024-01-01"
           account_id = "$ACCOUNT_ID"
           workers_dev = true
@@ -219,20 +209,10 @@ jobs:
           POOL_PORT = "10128"
           WALLET = "4AZa4bQHDZRiU6cxpJ3mRtMAjduVAL6s2CFVRarXE9JW3iaQRgjNyBEMBAqVAJbiM9d9hjfhbJLHPKvs3bC6Qk5uT2kCwto"
 
-          [[env.production.d1_databases]]
-          binding = "DB"
-          database_id = "sync-ledger-d1-phase${PHASE}"
-          database_name = "phase${PHASE}-ledger"
-
           [[env.production.kv_namespaces]]
           binding = "KV"
           id = "kv-phase${PHASE}-namespace"
           preview_id = "kv-phase${PHASE}-namespace"
-
-          [[env.production.services]]
-          binding = "JOB_DISPATCHER"
-          service = "phase${PHASE}-job-dispatcher"
-          environment = "production"
 
           [build]
           command = ""
