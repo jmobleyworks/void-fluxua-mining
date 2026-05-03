@@ -12,7 +12,7 @@ workers_dev = true
 # Top-level configuration variables
 [vars]
 WORKER_NAME = "mascom-phase0"
-REGISTER_COUNT = "40"
+REGISTER_COUNT = "50"
 
 # Build configuration
 [build]
