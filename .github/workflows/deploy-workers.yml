@@ -14,6 +14,7 @@ on:
 env:
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
   CF_API_KEY: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CF_API_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
   CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
 
 jobs:
@@ -38,6 +39,10 @@ jobs:
 
       - name: Deploy mascom-phase0
         run: |
+          echo "Using credentials:"
+          echo "  Account ID: ${CLOUDFLARE_ACCOUNT_ID:0:10}..."
+          echo "  Email: ${CLOUDFLARE_EMAIL}"
+          echo "  API Key: ${CF_API_KEY:0:10}..."
           wrangler deploy \
             --name mascom-phase0 \
             --config k10_wrangler.toml \
