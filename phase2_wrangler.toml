@@ -1,24 +1,15 @@
 name = "phase2-coord"
-main = "k10_worker_modern.js"
+main = "k_register_parameterized.js"
 compatibility_date = "2024-01-01"
 
 # Account configuration
 account_id = "e899c154113887c373fef4dc6ac63930"
 workers_dev = true
 
-# Environment: production (default)
-[env.production]
-
-# Environment variables (accessible as env.VARIABLE_NAME)
-[env.production.vars]
+# Top-level configuration variables
+[vars]
 WORKER_NAME = "phase2-coord"
-REGISTER_COUNT = "10"
-
-# D1 Database binding (packet pattern ledger storage with SQL queries)
-[[env.production.d1_databases]]
-binding = "DB"
-database_id = "sync-ledger-d1-phase2"
-database_name = "phase2-coord-ledger"
+REGISTER_COUNT = "50"
 
 # Build configuration
 [build]
