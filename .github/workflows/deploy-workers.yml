@@ -38,11 +38,9 @@ jobs:
 
       - name: Deploy mascom-phase0
         run: |
-          export CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
           wrangler deploy \
             --name mascom-phase0 \
             --config k10_wrangler.toml \
-            --env="" \
             k10_worker_modern.js
 
       - name: Deploy 500 mining-register workers
@@ -50,7 +48,6 @@ jobs:
           #!/bin/bash
           set -e
 
-          export CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
           ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
           SCRIPT_DIR="gen0_stage2_deployment"
           WORKER_CODE="$SCRIPT_DIR/gen0_worker_complete.js"
