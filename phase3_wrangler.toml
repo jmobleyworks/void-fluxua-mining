@@ -1,0 +1,26 @@
+name = "phase3-coord"
+main = "k10_worker_modern.js"
+compatibility_date = "2024-01-01"
+
+# Account configuration
+account_id = "f07be5f84583d0d100b05aeeae56870b"
+workers_dev = true
+
+# Environment: production (default)
+[env.production]
+
+# Environment variables (accessible as env.VARIABLE_NAME)
+[env.production.vars]
+WORKER_NAME = "phase3-coord"
+REGISTER_COUNT = "10"
+
+# D1 Database binding (packet pattern ledger storage with SQL queries)
+[[env.production.d1_databases]]
+binding = "DB"
+database_id = "sync-ledger-d1-phase3"
+database_name = "phase3-coord-ledger"
+
+# Build configuration
+[build]
+command = ""
+cwd = ""
