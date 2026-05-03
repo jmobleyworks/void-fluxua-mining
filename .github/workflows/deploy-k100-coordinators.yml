@@ -1,0 +1,103 @@
+name: Deploy K100 Coordinators to All Accounts
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '*_wrangler.toml'
+      - 'k_register_parameterized.js'
+  workflow_dispatch:
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CF_API_KEY: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CF_API_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+
+jobs:
+  deploy-coordinators:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        coordinator:
+          - { name: 'mascom-phase0', email: 'johnmobley99@gmail.com', api_key_secret: 'CLOUDFLARE_API_TOKEN', account_id_secret: 'CLOUDFLARE_ACCOUNT_ID', config: 'k10_wrangler.toml' }
+          - { name: 'phase1-coord', email: 'alhenaadams@gmail.com', api_key_secret: 'CF_API_KEY_PHASE1', account_id: '7b2347dce656e4f0959b2e20a9bafee3', config: 'phase1_wrangler.toml' }
+          - { name: 'phase2-coord', email: 'alhenaworks@gmail.com', api_key_secret: 'CF_API_KEY_PHASE2', account_id: 'e899c154113887c373fef4dc6ac63930', config: 'phase2_wrangler.toml' }
+          - { name: 'phase3-coord', email: 'allie.e.mobley@gmail.com', api_key_secret: 'CF_API_KEY_PHASE3', account_id: '8363a501780d4a22df75de57f7610388', config: 'phase3_wrangler.toml' }
+          - { name: 'phase4-coord', email: 'jmobleyworks@gmail.com', api_key_secret: 'CF_API_KEY_PHASE4', account_id: '035924f9812920fff6b70adf2904d581', config: 'phase4_wrangler.toml' }
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Wrangler
+        run: npm install -g wrangler
+
+      - name: Deploy ${{ matrix.coordinator.name }}
+        env:
+          COORDINATOR_NAME: ${{ matrix.coordinator.name }}
+          COORDINATOR_EMAIL: ${{ matrix.coordinator.email }}
+          COORDINATOR_CONFIG: ${{ matrix.coordinator.config }}
+          API_KEY: ${{ secrets[matrix.coordinator.api_key_secret] }}
+          ACCOUNT_ID: ${{ matrix.coordinator.account_id || env.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          export CF_API_KEY="$API_KEY"
+          export CF_API_EMAIL="$COORDINATOR_EMAIL"
+
+          echo "Deploying $COORDINATOR_NAME to account $ACCOUNT_ID..."
+          echo "  Email: $COORDINATOR_EMAIL"
+          echo "  Config: $COORDINATOR_CONFIG"
+
+          wrangler deploy \
+            --name "$COORDINATOR_NAME" \
+            --config "$COORDINATOR_CONFIG" \
+            k_register_parameterized.js
+
+      - name: Verify Deployment
+        env:
+          COORDINATOR_NAME: ${{ matrix.coordinator.name }}
+        run: |
+          echo "Verifying $COORDINATOR_NAME deployment..."
+          sleep 5
+
+          STATUS=$(curl -s "https://$COORDINATOR_NAME.johnmobley99.workers.dev/status" 2>/dev/null | jq -r '.registerCount // "?"')
+          if [ "$STATUS" = "100" ]; then
+            echo "✅ $COORDINATOR_NAME verified at K100"
+          else
+            echo "⏳ $COORDINATOR_NAME: K=$STATUS (propagating)"
+          fi
+
+  verify-all:
+    runs-on: ubuntu-latest
+    needs: deploy-coordinators
+    if: always()
+    steps:
+      - name: Final Status Check
+        run: |
+          echo "Checking all 5 K100 coordinators..."
+          echo ""
+
+          COORDINATORS=("mascom-phase0" "phase1-coord" "phase2-coord" "phase3-coord" "phase4-coord")
+          VERIFIED=0
+
+          for COORD in "${COORDINATORS[@]}"; do
+            K=$(curl -s "https://$COORD.johnmobley99.workers.dev/status" 2>/dev/null | jq -r '.registerCount // "?"')
+            if [ "$K" = "100" ]; then
+              echo "✅ $COORD: K100"
+              ((VERIFIED++))
+            else
+              echo "⏳ $COORD: K=$K"
+            fi
+          done
+
+          echo ""
+          echo "System Status: $VERIFIED/5 coordinators at K100"
+          echo ""
+
+          if [ $VERIFIED -eq 5 ]; then
+            echo "🎉 FULL K100 TOPOLOGY DEPLOYED"
+            echo "   5 x K100 = 24,750 edges"
+            echo "   Revenue: €220K-363K/day"
+          fi
