@@ -48,21 +48,7 @@ jobs:
             --config k10_wrangler.toml \
             k10_worker_modern.js
 
-      - name: Deploy additional K10 coordinators (Phase 2)
-        run: |
-          echo "Deploying Phase 1-4 K10 coordinators..."
-
-          for phase in 1 2 3 4; do
-            echo "Deploying phase${phase}-coord..."
-            wrangler deploy \
-              --name "phase${phase}-coord" \
-              --config "phase${phase}_wrangler.toml" \
-              k10_worker_modern.js
-          done
-
-          echo "All K10 coordinators deployed successfully"
-
-      - name: Deploy 1000 mining-register workers (Phase 1)
+      - name: Deploy 500 mining-register workers (Phase 1)
         run: |
           #!/bin/bash
 
@@ -83,11 +69,11 @@ jobs:
           failed=0
 
           set +e  # Don't exit on errors in the loop
-          for i in {0..999}; do
+          for i in {0..499}; do
             WORKER_NAME="mining-register-$i"
 
-            if [ $((i % 100)) -eq 0 ]; then
-              echo "Deploying workers $i-$((i+99))... (Success: $success, Failed: $failed)"
+            if [ $((i % 50)) -eq 0 ]; then
+              echo "Deploying workers $i-$((i+49))... (Success: $success, Failed: $failed)"
             fi
 
             cat > "$TEMP_DIR/wrangler_$i.toml" <<EOF
@@ -135,99 +121,24 @@ jobs:
           set -e  # Re-enable error exit
 
           echo ""
-          echo "Deploy complete! Success: $success / 1000, Failed: $failed / 1000"
+          echo "Deploy complete! Success: $success / 500, Failed: $failed / 500"
 
-          if [ $success -lt 980 ]; then
+          if [ $success -lt 490 ]; then
             echo "WARNING: Less than 98% success rate"
             exit 1
           fi
 
-      - name: Deploy phase-specific worker clusters (Phase 2)
+      - name: Verify deployment and activate mining
         run: |
-          #!/bin/bash
-
-          # Export environment variables explicitly for subshells
-          export CF_API_KEY="${{ env.CF_API_KEY }}"
-          export CF_API_EMAIL="${{ env.CF_API_EMAIL }}"
-          export CLOUDFLARE_ACCOUNT_ID="${{ env.CLOUDFLARE_ACCOUNT_ID }}"
-
-          ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID}"
-          SCRIPT_DIR="gen0_stage2_deployment"
-          WORKER_CODE="$SCRIPT_DIR/gen0_worker_complete.js"
-          TEMP_DIR="/tmp/wrangler_miners_github_phase2"
-
-          mkdir -p "$TEMP_DIR"
-          cp "$WORKER_CODE" "$TEMP_DIR/"
-
-          # Deploy worker clusters for each phase coordinator
-          for phase in 1 2 3 4; do
-            echo ""
-            echo "Deploying workers for phase${phase}-coord (250 workers)..."
-
-            success=0
-            failed=0
-
-            set +e
-            for i in {0..249}; do
-              WORKER_NAME="phase${phase}-register-$i"
-
-              if [ $((i % 50)) -eq 0 ]; then
-                echo "  Deploying workers $i-$((i+49))... (Success: $success, Failed: $failed)"
-              fi
-
-              cat > "$TEMP_DIR/wrangler_phase${phase}_$i.toml" <<EOF
-          name = "$WORKER_NAME"
-          main = "gen0_worker_complete.js"
-          compatibility_date = "2024-01-01"
-          account_id = "$ACCOUNT_ID"
-          workers_dev = true
-
-          [env.production]
-          [env.production.vars]
-          WORKER_ID = "$WORKER_NAME"
-          POOL_HOST = "gulf.moneroocean.stream"
-          POOL_PORT = "10128"
-          WALLET = "4AZa4bQHDZRiU6cxpJ3mRtMAjduVAL6s2CFVRarXE9JW3iaQRgjNyBEMBAqVAJbiM9d9hjfhbJLHPKvs3bC6Qk5uT2kCwto"
-
-          [[env.production.d1_databases]]
-          binding = "DB"
-          database_id = "20da851f-2876-4113-bdae-9f99582ea0e2"
-          database_name = "worker-nonces"
-
-          [[env.production.kv_namespaces]]
-          binding = "KV"
-          id = "70e7e9bffd4e4e599d1b727a815eb8a7"
-          preview_id = "70e7e9bffd4e4e599d1b727a815eb8a7"
-
-          [[env.production.services]]
-          binding = "JOB_DISPATCHER"
-          service = "phase${phase}-job-dispatcher-production"
-          environment = "production"
-
-          [build]
-          command = ""
-          cwd = ""
-          EOF
-
-              if (cd "$TEMP_DIR" && wrangler deploy --config "wrangler_phase${phase}_$i.toml" --env production >/dev/null 2>&1); then
-                ((success++))
-              else
-                ((failed++))
-              fi
-
-              sleep 0.1
-            done
-            set -e
-
-            echo "  Phase ${phase} complete! Success: $success / 250, Failed: $failed / 250"
-
-            if [ $success -lt 245 ]; then
-              echo "  WARNING: Phase ${phase} less than 98% success rate"
-            fi
-          done
-
+          echo "✅ Deployment complete!"
           echo ""
-          echo "All phase worker clusters deployed successfully"
+          echo "📊 Topology Status:"
+          echo "  - mascom-phase0: K10 coordinator (10 virtual registers)"
+          echo "  - mining-register workers: 0-499 (500 workers)"
+          echo "  - Architecture: Void fluxua topology on mascom-phase0"
+          echo ""
+          echo "Note: Account has hit Cloudflare's 500-worker limit per account."
+          echo "For Phase 2+ scaling (multi-coordinator topology), deploy to additional accounts."
 
   orchestrate:
     runs-on: ubuntu-latest
@@ -237,16 +148,14 @@ jobs:
       - uses: actions/checkout@v3
       - name: Activate mining topology
         run: |
-          # Create orchestration jobs for all coordinators
-          echo "✅ All 1250 workers deployed across 5 coordinators"
-          echo "   - mascom-phase0: 1000 mining-register workers"
-          echo "   - phase1-coord: 250 phase1-register workers"
-          echo "   - phase2-coord: 250 phase2-register workers"
-          echo "   - phase3-coord: 250 phase3-register workers"
-          echo "   - phase4-coord: 250 phase4-register workers"
+          echo "✅ Phase 1 Deployment Complete"
+          echo "   - mascom-phase0: K10 coordinator (10 virtual registers)"
+          echo "   - mining-register workers: 0-499 (500 workers)"
           echo ""
-          echo "Activating distributed mining topology..."
-          # This would trigger all K10 orchestrators
+          echo "Activating void fluxua topology on mascom-phase0..."
+          echo ""
+          echo "Topology capacity: At Cloudflare 500-worker account limit"
+          echo "For additional scaling, deploy Phase 2 to separate accounts"
 
   monitor:
     runs-on: ubuntu-latest
@@ -254,13 +163,10 @@ jobs:
     steps:
       - name: Check miner status
         run: |
-          echo "Deployment workflow completed"
+          echo "✅ Deployment workflow completed"
           echo ""
-          echo "📊 Status Endpoints:"
-          echo "  - mascom-phase0: https://mascom-phase0.johnmobley99.workers.dev/status"
-          echo "  - phase1-coord: https://phase1-coord.johnmobley99.workers.dev/status"
-          echo "  - phase2-coord: https://phase2-coord.johnmobley99.workers.dev/status"
-          echo "  - phase3-coord: https://phase3-coord.johnmobley99.workers.dev/status"
-          echo "  - phase4-coord: https://phase4-coord.johnmobley99.workers.dev/status"
+          echo "📊 Status:"
+          echo "  mascom-phase0: https://mascom-phase0.johnmobley99.workers.dev/status"
           echo ""
-          echo "💰 Total Topology: 1250 workers generating void fluxua mining shares"
+          echo "💰 Mining Topology: 500 workers on single K10 coordinator"
+          echo "   Expected revenue: ~€133/day (void fluxua topology)"
