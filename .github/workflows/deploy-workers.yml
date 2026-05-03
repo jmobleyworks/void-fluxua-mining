@@ -41,6 +41,7 @@ jobs:
           wrangler deploy \
             --name mascom-phase0 \
             --config k10_wrangler.toml \
+            --env="" \
             k10_worker_modern.js
 
       - name: Deploy 500 mining-register workers
