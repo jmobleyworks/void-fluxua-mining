@@ -23,17 +23,25 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install Wrangler
         run: npm install -g wrangler
 
+      - name: Verify credentials
+        run: |
+          echo "Account ID: ${CLOUDFLARE_ACCOUNT_ID:0:10}..."
+          echo "API Token: ${CLOUDFLARE_API_TOKEN:0:10}..."
+          [ ! -z "$CLOUDFLARE_ACCOUNT_ID" ] || echo "❌ Missing CLOUDFLARE_ACCOUNT_ID"
+          [ ! -z "$CLOUDFLARE_API_TOKEN" ] || echo "❌ Missing CLOUDFLARE_API_TOKEN"
+
       - name: Deploy mascom-phase0
         run: |
+          export CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
           wrangler deploy \
             --name mascom-phase0 \
             --config k10_wrangler.toml \
-            --account-id $CLOUDFLARE_ACCOUNT_ID \
+            --account-id ${{ secrets.CLOUDFLARE_ACCOUNT_ID }} \
             k10_worker_modern.js
 
       - name: Deploy 500 mining-register workers
@@ -41,6 +49,8 @@ jobs:
           #!/bin/bash
           set -e
 
+          export CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
+          ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
           SCRIPT_DIR="gen0_stage2_deployment"
           WORKER_CODE="$SCRIPT_DIR/gen0_worker_complete.js"
           TEMP_DIR="/tmp/wrangler_miners_github"
@@ -62,7 +72,7 @@ jobs:
           name = "$WORKER_NAME"
           main = "gen0_worker_complete.js"
           compatibility_date = "2024-01-01"
-          account_id = "$CLOUDFLARE_ACCOUNT_ID"
+          account_id = "$ACCOUNT_ID"
           workers_dev = true
 
           [env.production]
@@ -92,7 +102,7 @@ jobs:
           cwd = ""
           EOF
 
-            if (cd "$TEMP_DIR" && wrangler deploy --config "wrangler_$i.toml" --env production 2>/dev/null); then
+            if (cd "$TEMP_DIR" && wrangler deploy --config "wrangler_$i.toml" --env production 2>&1 | grep -q "Uploaded.*wrangler_$i.toml\|deployed successfully"); then
               ((success++))
             else
               ((failed++))
