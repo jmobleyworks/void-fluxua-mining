@@ -1,17 +1,17 @@
 name = "phase2-coord"
-main = "k_register_parameterized.js"
-compatibility_date = "2024-01-01"
-
-# Account configuration
+type = "javascript"
 account_id = "e899c154113887c373fef4dc6ac63930"
 workers_dev = true
+compatibility_date = "2024-01-01"
 
-# Top-level configuration variables
-[vars]
-WORKER_NAME = "phase2-coord"
-REGISTER_COUNT = "100"
+[env.production]
+name = "phase2-coord-prod"
 
-# Build configuration
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "kv-phase2-namespace"
+preview_id = "kv-phase2-namespace"
+
 [build]
 command = ""
 cwd = ""

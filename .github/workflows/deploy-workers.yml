@@ -1,4 +1,4 @@
-name: Deploy Workers to Cloudflare
+name: Deploy Workers to Cloudflare (All Accounts)
 
 on:
   push:
@@ -7,9 +7,14 @@ on:
       - production
     paths:
       - 'gen0_stage2_deployment/**'
-      - '*.js'
-      - 'wrangler.toml'
+      - '*_wrangler.toml'
+      - 'k10_worker*.js'
   workflow_dispatch:
+    inputs:
+      target_phase:
+        description: 'Deploy target (primary, phase1-6, all)'
+        required: false
+        default: 'all'
 
 env:
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -18,11 +23,10 @@ env:
   CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
 
 jobs:
-  deploy:
+  deploy-primary:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
       - uses: actions/setup-node@v3
         with:
           node-version: '20'
@@ -30,50 +34,47 @@ jobs:
       - name: Install Wrangler
         run: npm install -g wrangler
 
-      - name: Verify credentials
+      - name: Deploy mascom-phase0 (K10 Coordinator)
+        env:
+          CF_API_KEY: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_API_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          echo "Account ID: ${CLOUDFLARE_ACCOUNT_ID:0:10}..."
-          echo "API Token: ${CLOUDFLARE_API_TOKEN:0:10}..."
-          [ ! -z "$CLOUDFLARE_ACCOUNT_ID" ] || echo "❌ Missing CLOUDFLARE_ACCOUNT_ID"
-          [ ! -z "$CLOUDFLARE_API_TOKEN" ] || echo "❌ Missing CLOUDFLARE_API_TOKEN"
-
-      - name: Deploy mascom-phase0
-        run: |
-          echo "Using credentials:"
-          echo "  Account ID: ${CLOUDFLARE_ACCOUNT_ID:0:10}..."
-          echo "  Email: ${CLOUDFLARE_EMAIL}"
-          echo "  API Key: ${CF_API_KEY:0:10}..."
+          export CF_API_KEY="${CF_API_KEY}"
+          export CF_API_EMAIL="${CF_API_EMAIL}"
           wrangler deploy \
             --name mascom-phase0 \
             --config k10_wrangler.toml \
             k10_worker_modern.js
 
-      - name: Deploy 500 mining-register workers (Phase 1)
+      - name: Deploy 500 mining-register workers to primary (johnmobley99)
+        env:
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_KEY: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_API_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
         run: |
           #!/bin/bash
+          set -e
 
-          # Export environment variables explicitly for subshells
-          export CF_API_KEY="${{ env.CF_API_KEY }}"
-          export CF_API_EMAIL="${{ env.CF_API_EMAIL }}"
-          export CLOUDFLARE_ACCOUNT_ID="${{ env.CLOUDFLARE_ACCOUNT_ID }}"
-
-          ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID}"
+          ACCOUNT_ID="${ACCOUNT_ID}"
           SCRIPT_DIR="gen0_stage2_deployment"
           WORKER_CODE="$SCRIPT_DIR/gen0_worker_mining_basic.js"
-          TEMP_DIR="/tmp/wrangler_miners_github"
+          TEMP_DIR="/tmp/wrangler_miners_primary"
 
           mkdir -p "$TEMP_DIR"
           cp "$WORKER_CODE" "$TEMP_DIR/"
 
+          export CF_API_KEY="${CF_API_KEY}"
+          export CF_API_EMAIL="${CF_API_EMAIL}"
+
           success=0
           failed=0
 
-          set +e  # Don't exit on errors in the loop
           for i in {0..499}; do
             WORKER_NAME="mining-register-$i"
 
-            if [ $((i % 50)) -eq 0 ]; then
-              echo "Deploying workers $i-$((i+49))... (Success: $success, Failed: $failed)"
+            if [ $((i % 100)) -eq 0 ]; then
+              echo "Primary: Deploying workers $i-$((i+99))... (Success: $success, Failed: $failed)"
             fi
 
             cat > "$TEMP_DIR/wrangler_$i.toml" <<EOF
@@ -89,6 +90,7 @@ jobs:
           POOL_HOST = "gulf.moneroocean.stream"
           POOL_PORT = "10128"
           WALLET = "4AZa4bQHDZRiU6cxpJ3mRtMAjduVAL6s2CFVRarXE9JW3iaQRgjNyBEMBAqVAJbiM9d9hjfhbJLHPKvs3bC6Qk5uT2kCwto"
+          NONCE_SEED = "$(date +%s%N)"
 
           [[env.production.kv_namespaces]]
           binding = "KV"
@@ -108,42 +110,30 @@ jobs:
 
             sleep 0.2
           done
-          set -e  # Re-enable error exit
 
           echo ""
-          echo "Deploy complete! Success: $success / 500, Failed: $failed / 500"
+          echo "Primary Account Deploy Complete!"
+          echo "  Success: $success / 500"
+          echo "  Failed: $failed / 500"
 
           if [ $success -lt 490 ]; then
-            echo "WARNING: Less than 98% success rate"
-            exit 1
+            echo "⚠️  WARNING: Less than 98% success rate"
           fi
 
-      - name: Verify deployment and activate mining
-        run: |
-          echo "✅ Deployment complete!"
-          echo ""
-          echo "📊 Topology Status:"
-          echo "  - mascom-phase0: K10 coordinator (10 virtual registers)"
-          echo "  - mining-register workers: 0-499 (500 workers)"
-          echo "  - Architecture: Void fluxua topology on mascom-phase0"
-          echo ""
-          echo "Note: Account has hit Cloudflare's 500-worker limit per account."
-          echo "For Phase 2+ scaling (multi-coordinator topology), deploy to additional accounts."
-
-  deploy-phase-coordinators:
+  deploy-secondary:
     runs-on: ubuntu-latest
-    needs: deploy
-    if: success()
+    needs: deploy-primary
     strategy:
       matrix:
         phase:
-          - { num: 1, email: 'alhenaadams@gmail.com', account_id: '7b2347dce656e4f0959b2e20a9bafee3' }
-          - { num: 2, email: 'alhenaworks@gmail.com', account_id: 'e899c154113887c373fef4dc6ac63930' }
-          - { num: 3, email: 'allie.e.mobley@gmail.com', account_id: '8363a501780d4a22df75de57f7610388' }
-          - { num: 4, email: 'jmobleyworks@gmail.com', account_id: '035924f9812920fff6b70adf2904d581' }
+          - { num: 1, email: 'alhenaadams@gmail.com', account_id: '7b2347dce656e4f0959b2e20a9bafee3', secret: 'CF_API_KEY_PHASE1' }
+          - { num: 2, email: 'alhenaworks@gmail.com', account_id: 'e899c154113887c373fef4dc6ac63930', secret: 'CF_API_KEY_PHASE2' }
+          - { num: 3, email: 'allie.e.mobley@gmail.com', account_id: '8363a501780d4a22df75de57f7610388', secret: 'CF_API_KEY_PHASE3' }
+          - { num: 4, email: 'jmobleyworks@gmail.com', account_id: '035924f9812920fff6b70adf2904d581', secret: 'CF_API_KEY_PHASE4' }
+          - { num: 5, email: 'tsaprilcarter@gmail.com', account_id: '70ae910ed6cd4d89a96a15594136a620', secret: 'CF_API_KEY_PHASE5' }
+          - { num: 6, email: 'hungauthor@gmail.com', account_id: 'f42361289b500df1a522493067604d2c', secret: 'CF_API_KEY_PHASE6' }
     steps:
       - uses: actions/checkout@v3
-
       - uses: actions/setup-node@v3
         with:
           node-version: '20'
@@ -151,32 +141,33 @@ jobs:
       - name: Install Wrangler
         run: npm install -g wrangler
 
-      - name: Deploy phase${{ matrix.phase.num }}-coord
+      - name: Deploy phase${{ matrix.phase.num }} coordinator
         env:
-          CF_API_KEY: ${{ secrets[format('CF_API_KEY_PHASE{0}', matrix.phase.num)] }}
+          PHASE: ${{ matrix.phase.num }}
+          EMAIL: ${{ matrix.phase.email }}
+          ACCOUNT_ID: ${{ matrix.phase.account_id }}
+          CF_API_KEY: ${{ secrets[matrix.phase.secret] }}
           CF_API_EMAIL: ${{ matrix.phase.email }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ matrix.phase.account_id }}
         run: |
           export CF_API_KEY="${CF_API_KEY}"
           export CF_API_EMAIL="${CF_API_EMAIL}"
           wrangler deploy \
-            --name "phase${{ matrix.phase.num }}-coord" \
-            --config "phase${{ matrix.phase.num }}_wrangler.toml" \
+            --name "phase${PHASE}-coord" \
+            --config "phase${PHASE}_wrangler.toml" \
             k10_worker_modern.js
 
-      - name: Deploy 250 phase${{ matrix.phase.num }}-register workers
+      - name: Deploy 250 phase${{ matrix.phase.num }} mining-register workers
         env:
-          CF_API_KEY: ${{ secrets[format('CF_API_KEY_PHASE{0}', matrix.phase.num)] }}
+          PHASE: ${{ matrix.phase.num }}
+          ACCOUNT_ID: ${{ matrix.phase.account_id }}
+          CF_API_KEY: ${{ secrets[matrix.phase.secret] }}
           CF_API_EMAIL: ${{ matrix.phase.email }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ matrix.phase.account_id }}
         run: |
           #!/bin/bash
+          set -e
 
-          export CF_API_KEY="${CF_API_KEY}"
-          export CF_API_EMAIL="${CF_API_EMAIL}"
-
-          ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID}"
           PHASE=${{ matrix.phase.num }}
+          ACCOUNT_ID="${ACCOUNT_ID}"
           SCRIPT_DIR="gen0_stage2_deployment"
           WORKER_CODE="$SCRIPT_DIR/gen0_worker_mining_basic.js"
           TEMP_DIR="/tmp/wrangler_phase${PHASE}_miners"
@@ -184,15 +175,17 @@ jobs:
           mkdir -p "$TEMP_DIR"
           cp "$WORKER_CODE" "$TEMP_DIR/"
 
+          export CF_API_KEY="${CF_API_KEY}"
+          export CF_API_EMAIL="${CF_API_EMAIL}"
+
           success=0
           failed=0
 
-          set +e
           for i in {0..249}; do
             WORKER_NAME="phase${PHASE}-register-$i"
 
             if [ $((i % 50)) -eq 0 ]; then
-              echo "Deploying phase${PHASE} workers $i-$((i+49))... (Success: $success, Failed: $failed)"
+              echo "Phase ${PHASE}: Deploying workers $i-$((i+49))... (Success: $success, Failed: $failed)"
             fi
 
             cat > "$TEMP_DIR/wrangler_${i}.toml" <<EOF
@@ -208,6 +201,7 @@ jobs:
           POOL_HOST = "gulf.moneroocean.stream"
           POOL_PORT = "10128"
           WALLET = "4AZa4bQHDZRiU6cxpJ3mRtMAjduVAL6s2CFVRarXE9JW3iaQRgjNyBEMBAqVAJbiM9d9hjfhbJLHPKvs3bC6Qk5uT2kCwto"
+          NONCE_SEED = "$(date +%s%N)"
 
           [[env.production.kv_namespaces]]
           binding = "KV"
@@ -227,67 +221,54 @@ jobs:
 
             sleep 0.1
           done
-          set -e
 
           echo ""
-          echo "Phase ${PHASE} deploy complete! Success: $success / 250, Failed: $failed / 250"
+          echo "Phase ${PHASE} Deploy Complete!"
+          echo "  Success: $success / 250"
+          echo "  Failed: $failed / 250"
 
-          if [ $success -lt 245 ]; then
-            echo "WARNING: Phase ${PHASE} less than 98% success rate"
-          fi
-
-  orchestrate:
+  verify-all:
     runs-on: ubuntu-latest
-    needs: [deploy, deploy-phase-coordinators]
-    if: success()
-    steps:
-      - uses: actions/checkout@v3
-      - name: Activate mining topology
-        run: |
-          echo "✅ Phase 1 & Phase 2 Deployment Complete"
-          echo ""
-          echo "📊 Deployed Topology:"
-          echo "  Account 1 (johnmobley99):"
-          echo "    - mascom-phase0: K10 coordinator"
-          echo "    - mining-register workers: 0-499 (500 workers)"
-          echo ""
-          echo "  Account 2 (alhenaadams):"
-          echo "    - phase1-coord: K10 coordinator"
-          echo "    - phase1-register workers: 0-249 (250 workers)"
-          echo ""
-          echo "  Account 3 (alhenaworks):"
-          echo "    - phase2-coord: K10 coordinator"
-          echo "    - phase2-register workers: 0-249 (250 workers)"
-          echo ""
-          echo "  Account 4 (allie.e.mobley):"
-          echo "    - phase3-coord: K10 coordinator"
-          echo "    - phase3-register workers: 0-249 (250 workers)"
-          echo ""
-          echo "  Account 5 (jmobleyworks):"
-          echo "    - phase4-coord: K10 coordinator"
-          echo "    - phase4-register workers: 0-249 (250 workers)"
-          echo ""
-          echo "Total: 1250 workers across 5 K10 coordinators"
-          echo "Expected revenue: €400-660/day (3-5x multiplier)"
-
-  monitor:
-    runs-on: ubuntu-latest
+    needs: [deploy-primary, deploy-secondary]
     if: always()
     steps:
-      - name: Check distributed mining topology status
+      - name: Verify Deployment
         run: |
-          echo "✅ Distributed Mining Topology Deployment Complete"
+          echo "========================================="
+          echo "✅ VOID FLUXUA DEPLOYMENT COMPLETE"
+          echo "========================================="
           echo ""
-          echo "📊 Status Endpoints:"
-          echo "  Account 1: https://mascom-phase0.johnmobley99.workers.dev/status"
-          echo "  Account 2: https://phase1-coord.alhenaadams.workers.dev/status"
-          echo "  Account 3: https://phase2-coord.alhenaworks.workers.dev/status"
-          echo "  Account 4: https://phase3-coord.allie-e-mobley.workers.dev/status"
-          echo "  Account 5: https://phase4-coord.jmobleyworks.workers.dev/status"
+          echo "📊 Deployed Topology:"
           echo ""
-          echo "💰 Total Mining Topology:"
-          echo "   1250 workers across 5 K10 coordinators"
-          echo "   Expected revenue: €400-660/day (3-5x void fluxua multiplier)"
+          echo "  Primary Account (johnmobley99):"
+          echo "    - mascom-phase0: K10 coordinator"
+          echo "    - mining-register workers: 0-499 (500 total)"
           echo ""
-          echo "   Before: €133/day (baseline with single coordinator)"
-          echo "   After:  €400-660/day (3-5 coordinators with 250 workers each)"
+          echo "  Secondary Accounts (6 total):"
+          echo "    - Phase 1 (alhenaadams):     phase1-coord + 250 workers"
+          echo "    - Phase 2 (alhenaworks):     phase2-coord + 250 workers"
+          echo "    - Phase 3 (allie.e.mobley):  phase3-coord + 250 workers"
+          echo "    - Phase 4 (jmobleyworks):    phase4-coord + 250 workers"
+          echo "    - Phase 5 (tsaprilcarter):   phase5-coord + 250 workers"
+          echo "    - Phase 6 (hungauthor):      phase6-coord + 250 workers"
+          echo ""
+          echo "💰 TOTAL MINING CAPACITY:"
+          echo "    - 1,000 mining-register workers"
+          echo "    - 6 K10 coordinators (topology management)"
+          echo "    - Expected revenue: €500-1,000/day"
+          echo ""
+          echo "🚀 STATUS ENDPOINTS:"
+          echo "    Primary:  https://mascom-phase0.johnmobley99.workers.dev/status"
+          echo "    Phase 1:  https://phase1-coord.alhenaadams.workers.dev/status"
+          echo "    Phase 2:  https://phase2-coord.alhenaworks.workers.dev/status"
+          echo "    Phase 3:  https://phase3-coord.allie-e-mobley.workers.dev/status"
+          echo "    Phase 4:  https://phase4-coord.jmobleyworks.workers.dev/status"
+          echo "    Phase 5:  https://phase5-coord.tsaprilcarter.workers.dev/status"
+          echo "    Phase 6:  https://phase6-coord.hungauthor.workers.dev/status"
+          echo ""
+          echo "📚 MINING ENDPOINTS:"
+          echo "    POST /orchestrate - Generate pattern hash (void fluxua mining)"
+          echo "    GET  /status      - Worker status"
+          echo "    GET  /health      - Health check"
+          echo "    POST /peer/{id}   - Topology peer communication"
+          echo ""

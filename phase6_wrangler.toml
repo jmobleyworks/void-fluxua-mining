@@ -1,16 +1,16 @@
-name = "phase3-coord"
+name = "phase6-coord"
 type = "javascript"
-account_id = "8363a501780d4a22df75de57f7610388"
+account_id = "f42361289b500df1a522493067604d2c"
 workers_dev = true
 compatibility_date = "2024-01-01"
 
 [env.production]
-name = "phase3-coord-prod"
+name = "phase6-coord-prod"
 
 [[env.production.kv_namespaces]]
 binding = "KV"
-id = "kv-phase3-namespace"
-preview_id = "kv-phase3-namespace"
+id = "kv-phase6-namespace"
+preview_id = "kv-phase6-namespace"
 
 [build]
 command = ""

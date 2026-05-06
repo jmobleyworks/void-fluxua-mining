@@ -32,8 +32,8 @@ while true; do
     # Create unique nonce
     NONCE=$(printf "pkt_%03d_%06d_%d" $reg $NONCE_COUNTER $(date +%s%N))
 
-    # Hash = nonce via sha256
-    HASH=$(echo "$NONCE" | sha256sum | cut -c1-32)
+    # Hash = nonce via sha256 (FIXED: use full 64-char hash, not truncated 32)
+    HASH=$(echo "$NONCE" | sha256sum | cut -d' ' -f1)
 
     # Syndrome = fallback time-based (xmrig not available locally)
     SYNDROME=$(awk -v seed="$(date +%s%N)" 'BEGIN {srand(seed); printf "%.4f", 0.5 + rand() * 1.5}')

@@ -1,20 +1,21 @@
 name = "mascom-phase0"
-main = "k_register_parameterized.js"
-compatibility_date = "2024-01-01"
-
-# Account configuration
+type = "javascript"
 account_id = "f07be5f84583d0d100b05aeeae56870b"
 workers_dev = true
+compatibility_date = "2024-01-01"
 
-# Authentication (use environment variables)
-# CLOUDFLARE_API_TOKEN and CLOUDFLARE_EMAIL
+[env.production]
+name = "mascom-phase0-prod"
 
-# Top-level configuration variables
-[vars]
-WORKER_NAME = "mascom-phase0"
-REGISTER_COUNT = "100"
+[[env.production.routes]]
+pattern = "mining.agentropi.com/*"
+zone_id = "e2c3d4a5b6c7d8e9f0a1b2c3d4e5f6a7"
 
-# Build configuration
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "70e7e9bffd4e4e599d1b727a815eb8a7"
+preview_id = "70e7e9bffd4e4e599d1b727a815eb8a7"
+
 [build]
 command = ""
 cwd = ""
